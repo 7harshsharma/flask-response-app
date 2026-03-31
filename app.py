@@ -1,10 +1,4 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[3]:
-
-
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import pandas as pd
 from datetime import datetime
 import os
@@ -34,6 +28,7 @@ def update_data(booking_id, status):
     df.to_csv(FILE_PATH, index=False)
 
 
+# ✅ RESPONSE CAPTURE
 @app.route('/response')
 def capture():
     booking_id = request.args.get('booking_id')
@@ -44,7 +39,17 @@ def capture():
     return f"✅ Response Recorded<br>Booking: {booking_id}<br>Status: {status}"
 
 
+# 🔥 NEW API (THIS WAS MISSING)
+@app.route('/data')
+def get_data():
+    if os.path.exists(FILE_PATH):
+        df = pd.read_csv(FILE_PATH)
+        return df.to_json(orient='records')
+    else:
+        return jsonify([])
+
+
+# ✅ HEALTH CHECK
 @app.route('/')
 def home():
     return "Server Running ✅"
-
