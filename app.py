@@ -28,28 +28,53 @@ def update_data(booking_id, status):
     df.to_csv(FILE_PATH, index=False)
 
 
-# ✅ RESPONSE CAPTURE
-@app.route('/response')
-def capture():
+# -------------------------------
+# STEP 1 PAGE (OPEN FROM EMAIL)
+# -------------------------------
+@app.route('/confirm')
+def confirm():
+    booking_id = request.args.get('booking_id')
+
+    return f"""
+    <h2>Check-in Confirmation</h2>
+    <p><b>Booking ID:</b> {booking_id}</p>
+
+    <a href="/submit?booking_id={booking_id}&status=YES" 
+       style="background:green;color:white;padding:10px 15px;text-decoration:none;">YES</a>
+
+    <a href="/submit?booking_id={booking_id}&status=NO" 
+       style="background:red;color:white;padding:10px 15px;text-decoration:none;margin-left:10px;">NO</a>
+    """
+
+
+# -------------------------------
+# STEP 2 (SAVE RESPONSE)
+# -------------------------------
+@app.route('/submit')
+def submit():
     booking_id = request.args.get('booking_id')
     status = request.args.get('status')
 
     update_data(booking_id, status)
 
-    return f"✅ Response Recorded<br>Booking: {booking_id}<br>Status: {status}"
+    return f"""
+    <h2>✅ Response Recorded</h2>
+    <p>Booking: {booking_id}</p>
+    <p>Status: {status}</p>
+    """
 
 
-# 🔥 NEW API (THIS WAS MISSING)
+# -------------------------------
+# DATA API
+# -------------------------------
 @app.route('/data')
 def get_data():
     if os.path.exists(FILE_PATH):
         df = pd.read_csv(FILE_PATH)
         return df.to_json(orient='records')
-    else:
-        return jsonify([])
+    return jsonify([])
 
 
-# ✅ HEALTH CHECK
 @app.route('/')
 def home():
     return "Server Running ✅"
