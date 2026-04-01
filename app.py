@@ -1,31 +1,45 @@
 from flask import Flask, request, jsonify
-import pandas as pd
 from datetime import datetime
-import os
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
 
-FILE_PATH = "responses.csv"
+# ===============================
+# GOOGLE SHEET SETUP
+# ===============================
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
 
+creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+client = gspread.authorize(creds)
+
+sheet = client.open("hotel_responses").sheet1
+
+
+# ===============================
+# UPDATE DATA (REPLACES CSV LOGIC)
+# ===============================
 def update_data(booking_id, status):
     booking_id = str(booking_id)
 
-    if os.path.exists(FILE_PATH):
-        df = pd.read_csv(FILE_PATH)
-    else:
-        df = pd.DataFrame(columns=['booking_id', 'checked_in', 'timestamp'])
+    records = sheet.get_all_records()
+    
+    # Check if booking exists
+    for idx, row in enumerate(records, start=2):  # start=2 because row 1 = header
+        if str(row.get('booking_id')) == booking_id:
+            sheet.update_cell(idx, 2, status)  # checked_in column
+            sheet.update_cell(idx, 3, str(datetime.now()))  # timestamp
+            return
 
-    if booking_id in df['booking_id'].values:
-        df.loc[df['booking_id'] == booking_id, 'checked_in'] = status
-        df.loc[df['booking_id'] == booking_id, 'timestamp'] = datetime.now()
-    else:
-        df = pd.concat([df, pd.DataFrame([{
-            "booking_id": booking_id,
-            "checked_in": status,
-            "timestamp": datetime.now()
-        }])])
-
-    df.to_csv(FILE_PATH, index=False)
+    # If not exists → append
+    sheet.append_row([
+        booking_id,
+        status,
+        str(datetime.now())
+    ])
 
 
 # -------------------------------
@@ -34,10 +48,15 @@ def update_data(booking_id, status):
 @app.route('/confirm')
 def confirm():
     booking_id = request.args.get('booking_id')
+    guest_name = request.args.get('guest_name', 'Guest')
 
     return f"""
     <h2>Check-in Confirmation</h2>
+
+    <p><b>Guest Name:</b> {guest_name}</p>
     <p><b>Booking ID:</b> {booking_id}</p>
+
+    <br>
 
     <a href="/submit?booking_id={booking_id}&status=YES" 
        style="background:green;color:white;padding:10px 15px;text-decoration:none;">YES</a>
@@ -65,14 +84,12 @@ def submit():
 
 
 # -------------------------------
-# DATA API
+# DATA API (FOR YOUR PYTHON SCRIPT)
 # -------------------------------
 @app.route('/data')
 def get_data():
-    if os.path.exists(FILE_PATH):
-        df = pd.read_csv(FILE_PATH)
-        return df.to_json(orient='records')
-    return jsonify([])
+    records = sheet.get_all_records()
+    return jsonify(records)
 
 
 @app.route('/')
